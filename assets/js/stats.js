@@ -121,6 +121,18 @@ const CupStats = (() => {
     return ev;
   }
 
+  // ✅ NEW: safer MOM team resolver (prevents wrong team attribution)
+  function resolvePomTeam(m){
+    const raw = String(m.pom_team || '').trim().toLowerCase();
+    if(!raw) return ''; // unknown -> show as '—' later
+
+    // normalize common inputs
+    if(raw === 'team1' || raw === '1' || raw === 'team 1' || raw === 't1' || raw === 'home') return 'team1';
+    if(raw === 'team2' || raw === '2' || raw === 'team 2' || raw === 't2' || raw === 'away') return 'team2';
+
+    return ''; // anything else -> unknown
+  }
+
   async function init(){
     try{
       const matches = await loadMatches();
@@ -144,11 +156,16 @@ const CupStats = (() => {
         parseList(m.red_team1).forEach(x=>addCount(rc, x.name, m.team1, x.n));
         parseList(m.red_team2).forEach(x=>addCount(rc, x.name, m.team2, x.n));
 
-        // MOM list
+        // MOM list  ✅ FIXED: only assign team if pom_team is explicit
         if((m.player_of_match||'').trim()){
-          const isT2 = (m.pom_team||'').trim()==='team2';
-          const team = isT2 ? m.team2 : m.team1;
-          momRows.push({match:m.match_id||m.code||m.match_code||'', code:m.code||m.match_code||'', player:m.player_of_match, team});
+          const side = resolvePomTeam(m); // 'team1' | 'team2' | ''
+          const team = side === 'team2' ? m.team2 : side === 'team1' ? m.team1 : ''; // unknown => blank
+          momRows.push({
+            match: m.match_id||m.code||m.match_code||'',
+            code:  m.code||m.match_code||'',
+            player: m.player_of_match,
+            team
+          });
         }
 
         // VAR per team
