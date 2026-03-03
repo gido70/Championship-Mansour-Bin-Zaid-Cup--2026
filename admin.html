@@ -84,6 +84,35 @@ select option{color:#000;background:#fff;}
           </div>
           <div class="hint" id="matchMeta" style="margin-top:8px"></div>
 
+          <!-- KO Teams + Team Pool (for QF/SF/F/TP only) -->
+          <div class="box hidden" id="koBox" style="border:1px dashed rgba(255,255,255,.35)">
+            <div class="hint" style="margin-bottom:8px">
+              <b>الأدوار النهائية:</b> اختر الفريقين من القائمة (16 فريق). يمكنك استبعاد الفرق التي خرجت لتسهيل الاختيار، وإضافة فريق بالخطأ إن لزم.
+            </div>
+            <div class="row">
+              <select id="ko_team1"></select>
+              <select id="ko_team2"></select>
+            </div>
+
+            <div style="height:8px"></div>
+            <div class="row">
+              <select id="poolTeam"></select>
+              <button class="btn small" id="btnExcludeTeam" type="button">استبعاد</button>
+              <button class="btn btn-gb small" id="btnResetPool" type="button">إعادة ضبط</button>
+            </div>
+
+            <div style="height:8px"></div>
+            <div class="row">
+              <input id="addTeamName" placeholder="إضافة فريق (اختياري)" />
+              <button class="btn small" id="btnAddTeam" type="button">إضافة</button>
+            </div>
+
+            <div class="hint" style="margin-top:8px">
+              ملاحظة: الاستبعاد/الإضافة محفوظة على هذا الجهاز فقط.
+            </div>
+          </div>
+
+
           <div style="height:10px"></div>
           <div class="row">
             <input id="score1" placeholder="نتيجة الفريق 1" inputmode="numeric" />
