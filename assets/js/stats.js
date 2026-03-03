@@ -2,7 +2,6 @@
 const CupStats = (() => {
 
   const qs = (s, el=document)=>el.querySelector(s);
-  const qsa = (s, el=document)=>Array.from(el.querySelectorAll(s));
 
   function showError(msg){
     const box = qs('#loadError');
@@ -51,17 +50,28 @@ const CupStats = (() => {
     return parseCSV(txt);
   }
 
+  function pickScorersField(m, side){ // side: 1 or 2
+    const s = (m[`scorers_team${side}`] || '').trim();
+    if(s) return s;
+    return (m[`goals_team${side}`] || '').trim(); // fallback (كثير من الإدخالات هنا)
+  }
+
   function parseList(s){
     // Supported formats:
     // 1) "Name|2;Name2|1"
     // 2) "Name (2);Name2 (1)"  (Arabic-friendly display)
     // 3) "Name;Name2"  (defaults to 1)
+    // Also supports separators: ;  ،  ,  newlines
     s = String(s||'').trim();
     if(!s) return [];
-    return s.split(';').map(x=>x.trim()).filter(Boolean).map(item=>{
+
+    // unify separators
+    const parts = s.split(/[;\n،,]+/).map(x=>x.trim()).filter(Boolean);
+
+    return parts.map(item=>{
       // try pipe format
-      const parts = item.split('|').map(p=>p.trim());
-      if(parts.length>=2 && /^\d+$/.test(parts[1])) return {name:parts[0], n:parseInt(parts[1],10)};
+      const pipe = item.split('|').map(p=>p.trim());
+      if(pipe.length>=2 && /^\d+$/.test(pipe[1])) return {name:pipe[0], n:parseInt(pipe[1],10)};
 
       // try parentheses count: "Name (2)" or "Name(2)"
       const m = item.match(/^(.*?)[\s]*\((\d+)\)\s*$/);
@@ -124,9 +134,9 @@ const CupStats = (() => {
       const varByTeam = {}; // team name -> {used, good, bad}
 
       matches.forEach(m=>{
-        // scorers
-        parseList(m.scorers_team1).forEach(x=>addCount(scorers, x.name, m.team1, x.n));
-        parseList(m.scorers_team2).forEach(x=>addCount(scorers, x.name, m.team2, x.n));
+        // scorers (scorers_teamX or fallback goals_teamX)
+        parseList(pickScorersField(m,1)).forEach(x=>addCount(scorers, x.name, m.team1, x.n));
+        parseList(pickScorersField(m,2)).forEach(x=>addCount(scorers, x.name, m.team2, x.n));
 
         // cards
         parseList(m.yellow_team1).forEach(x=>addCount(yc, x.name, m.team1, x.n));
@@ -138,7 +148,7 @@ const CupStats = (() => {
         if((m.player_of_match||'').trim()){
           const isT2 = (m.pom_team||'').trim()==='team2';
           const team = isT2 ? m.team2 : m.team1;
-          momRows.push({match:m.match_id||m.code||'', code:m.code||'', player:m.player_of_match, team});
+          momRows.push({match:m.match_id||m.code||m.match_code||'', code:m.code||m.match_code||'', player:m.player_of_match, team});
         }
 
         // VAR per team
@@ -149,7 +159,7 @@ const CupStats = (() => {
             if(!teamName) return;
             if(!varByTeam[teamName]) varByTeam[teamName]={team:teamName, used:0, good:0, bad:0};
             varByTeam[teamName].used += 1;
-            // benefit heuristic: awarded/cancelled = good, confirmed = bad
+            // benefit heuristic: awarded/cancelled/reversed = good, confirmed = bad
             if(e.result==='confirmed') varByTeam[teamName].bad += 1;
             else varByTeam[teamName].good += 1;
           });
