@@ -1,22 +1,18 @@
-/* Mansour Cup 2026 - Robust CSV-driven front-end (no external libs) */
-const CupApp = (() => {
+/* MBZ Cup 2026 - Admin Panel (static, generates matches.csv for upload) */
+(() => {
+  "use strict";
 
-  function qs(sel){ return document.querySelector(sel); }
-  function qsa(sel){ return Array.from(document.querySelectorAll(sel)); }
+  // ====== EDIT PIN HERE (numbers only) ======
+  const ADMIN_PIN = "2026";
 
-  function getParam(name){
-    const url = new URL(window.location.href);
-    return url.searchParams.get(name) || "";
-  }
+  // ====== Helpers ======
+  const qs = (s) => document.querySelector(s);
+  const escapeCSV = (v) => {
+    const s = String(v ?? "");
+    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
 
-  function showError(msg){
-    const el = qs('#loadError');
-    if(!el) return;
-    el.textContent = msg;
-    el.classList.remove('hidden');
-  }
-
-  // Basic CSV parser that supports quotes.
   function parseCSV(text){
     const rows = [];
     let row = [];
@@ -37,385 +33,810 @@ const CupApp = (() => {
         cur += ch;
       }
     }
-    row.push(cur);
-    rows.push(row);
-    // trim empty last line
-    if(rows.length && rows[rows.length-1].length===1 && rows[rows.length-1][0].trim()===""){
-      rows.pop();
-    }
-    const headers = rows.shift().map(h => h.trim());
+    row.push(cur); rows.push(row);
+    if(rows.length && rows[rows.length-1].length===1 && rows[rows.length-1][0].trim()===""){ rows.pop(); }
+    const headers = (rows.shift() || []).map(h => h.trim());
     return rows.map(r => {
-      const obj = {};
-      headers.forEach((h, idx) => obj[h] = (r[idx] ?? "").trim());
-      return obj;
+      const o = {};
+      headers.forEach((h, idx) => o[h] = (r[idx] ?? "").trim());
+      return o;
     });
   }
 
-  async function loadMatches(){
-    try{
-      const res = await fetch('data/matches.csv?v=' + Date.now(), { cache: 'no-store' });
-      if(!res.ok) throw new Error('لم أستطع تحميل data/matches.csv (تأكد أنه موجود في المشروع).');
-      const text = await res.text();
-      const data = parseCSV(text);
-      // normalize
-      return data.map(m => ({
-        group: (m.group || "").toUpperCase(),
-        round: m.round || "",
-        date: m.date || "",
-        time: m.time || "",
-        team1: m.team1 || "",
-        team2: m.team2 || "",
-        score1: m.score1 || "",
-        score2: m.score2 || "",
-        referee1: m.referee1 || "",
-        referee2: m.referee2 || "",
-        commentator: m.commentator || "",
-        player_of_match: m.player_of_match || "",
-        // scorers/goals (accept multiple header variants)
-        goals_team1: m.goals_team1 || m.scorers_team1 || m.scorersHome || "",
-        goals_team2: m.goals_team2 || m.scorers_team2 || m.scorersAway || "",
-        // cards (text lists)
-        yellow_team1: m.yellow_team1 || m.yellows_team1 || m.yellow1 || "",
-        red_team1: m.red_team1 || m.reds_team1 || m.red1 || "",
-        yellow_team2: m.yellow_team2 || m.yellows_team2 || m.yellow2 || "",
-        red_team2: m.red_team2 || m.reds_team2 || m.red2 || "",
-        // VAR (0-2 per team)
-        var_team1: m.var_team1 || m.var1 || "",
-        var_team2: m.var_team2 || m.var2 || "",
-        match_code: m.match_code || m.code || ""
-      })).filter(m => m.group && m.match_code);
-    }catch(e){
-      showError(e.message || String(e));
-      return [];
+  async function fetchText(url){
+    const res = await fetch(url + (url.includes("?") ? "&" : "?") + "v=" + Date.now(), { cache:"no-store" });
+    if(!res.ok) throw new Error("فشل تحميل: " + url);
+    return await res.text();
+  }
+
+  function uniq(arr){
+    return Array.from(new Set(arr.map(x => String(x||"").trim()).filter(Boolean)));
+  }
+
+  function optionExists(sel, value){
+    if(!sel) return false;
+    const v = String(value||"").trim();
+    return Array.from(sel.options||[]).some(o => String(o.value||"").trim() === v);
+  }
+
+  function setSelectOrManual(selectSel, manualSel, value){
+    const sel = qs(selectSel);
+    const man = qs(manualSel);
+    if(!sel || !man) return;
+    const v = String(value||"").trim();
+    if(!v){ sel.value = ""; man.value = ""; return; }
+    if(optionExists(sel, v)){
+      sel.value = v;
+      man.value = "";
+    }else{
+      sel.value = "";
+      man.value = v;
     }
   }
 
-  function isPlayed(m){
-    return m.score1 !== "" && m.score2 !== "" && !isNaN(Number(m.score1)) && !isNaN(Number(m.score2));
+  function getSelectOrManual(selectSel, manualSel){
+    const man = qs(manualSel);
+    const sel = qs(selectSel);
+    const mv = man ? man.value.trim() : "";
+    if(mv) return mv;
+    return sel ? sel.value.trim() : "";
   }
 
-  function parseArabicDateToISO(dateStr){
-    // expects: "الخميس, فبراير 19, 2026" (weekday optional)
-    const s = String(dateStr||"").trim();
-    const m = s.match(/(يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر)\s+(\d{1,2}),\s*(\d{4})/);
-    if(!m) return "";
-    const monMap = { "يناير":"01","فبراير":"02","مارس":"03","أبريل":"04","مايو":"05","يونيو":"06","يوليو":"07","أغسطس":"08","سبتمبر":"09","أكتوبر":"10","نوفمبر":"11","ديسمبر":"12" };
-    const mm = monMap[m[1]] || "01";
-    const dd = String(m[2]).padStart(2,"0");
-    const yy = m[3];
-    return `${yy}-${mm}-${dd}`;
+  function formatListFromMap(map){
+    // map: name -> count
+    const items = Object.entries(map)
+      .filter(([n,c]) => n && c>0)
+      .sort((a,b)=> a[0].localeCompare(b[0],'ar'));
+    if(!items.length) return "";
+    // "Name (2)، Name2 (1)"
+    return items.map(([n,c]) => c===1 ? `${n} (1)` : `${n} (${c})`).join("، ");
   }
 
-  function matchKey(m){
-    const iso = parseArabicDateToISO(m.date);
-    const time = String(m.time||"").trim();
-    const hhmm = time && /^\d{1,2}:\d{2}$/.test(time) ? time.replace(":","") : "0000";
-    return `${iso}T${hhmm}`;
-  }
-
-  function sortByDateTimeDesc(a,b){
-    const ka = matchKey(a);
-    const kb = matchKey(b);
-    return kb.localeCompare(ka);
-  }
-
-  function sortByDateTimeAsc(a,b){
-    const ka = matchKey(a);
-    const kb = matchKey(b);
-    return ka.localeCompare(kb);
-  }
-
-  function isUpcoming(m){
-    if(isPlayed(m)) return false;
-    const iso = parseArabicDateToISO(m.date);
-    if(!iso) return true; // keep if date missing
-    const now = new Date();
-    const todayIso = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
-    // include today and after
-    return iso >= todayIso;
-  }
-
-  function computeStandings(matches, group){
-    const gMatches = matches.filter(m => m.group === group);
-    const teams = new Set();
-    gMatches.forEach(m => { teams.add(m.team1); teams.add(m.team2); });
-
-    const table = {};
-    for(const t of teams){
-      table[t] = { team:t, P:0, W:0, D:0, L:0, GF:0, GA:0, GD:0, Pts:0 };
+  function parseListToMap(text){
+    // Accept: "Name (2)، Name2 (1)" or "Name, Name2"
+    const s = String(text||"").trim();
+    const map = {};
+    if(!s) return map;
+    const parts = s.split(/[,;|\n،]+/).map(x=>x.trim()).filter(Boolean);
+    for(const p of parts){
+      const m = p.match(/^(.+?)\s*\((\d+)\)\s*$/);
+      if(m){
+        const name = m[1].trim();
+        const c = parseInt(m[2],10);
+        if(name) map[name] = (map[name]||0) + (isNaN(c)?1:c);
+      }else{
+        map[p] = (map[p]||0) + 1;
+      }
     }
+    return map;
+  }
 
-    for(const m of gMatches){
-      if(!isPlayed(m)) continue;
-      const s1 = Number(m.score1);
-      const s2 = Number(m.score2);
-      const t1 = table[m.team1] || (table[m.team1] = { team:m.team1, P:0, W:0, D:0, L:0, GF:0, GA:0, GD:0, Pts:0 });
-      const t2 = table[m.team2] || (table[m.team2] = { team:m.team2, P:0, W:0, D:0, L:0, GF:0, GA:0, GD:0, Pts:0 });
+  // ====== State ======
+  let roster = {};          // team -> {group, players:[{number,name}]}
+  let matches = [];
+let awards = null;         // array of objects from CSV
+  let headers = [];         // csv headers
+  let current = null;       // current match object reference
+  let originalSnapshot = ""; // for reset
 
-      t1.P++; t2.P++;
-      t1.GF += s1; t1.GA += s2;
-      t2.GF += s2; t2.GA += s1;
+  // scorers/cards maps & history for undo
+  let goalsMap1 = {}, goalsMap2 = {};
+  let yellowMap1 = {}, redMap1 = {}, yellowMap2 = {}, redMap2 = {};
+  let history = []; // {type, side, name, cardType?}
 
-      if(s1 > s2){ t1.W++; t2.L++; t1.Pts += 3; }
-      else if(s1 < s2){ t2.W++; t1.L++; t2.Pts += 3; }
-      else { t1.D++; t2.D++; t1.Pts += 1; t2.Pts += 1; }
+  // ====== VAR multi (max 4 events; 2 لكل فريق) ======
+  function getVarRowEls(i){
+    return {
+      team: qs(`#var${i}_team`),
+      type: qs(`#var${i}_type`),
+      result: qs(`#var${i}_result`)
+    };
+  }
+
+  function clearVAREventsUI(){
+    for(let i=1;i<=4;i++){
+      const r = getVarRowEls(i);
+      if(r.team) r.team.value = "";
+      if(r.type) r.type.value = "";
+      if(r.result) r.result.value = "";
     }
-
-    for(const t of Object.values(table)){
-      t.GD = t.GF - t.GA;
-    }
-
-    const arr = Object.values(table);
-    arr.sort((a,b) => {
-      if(b.Pts !== a.Pts) return b.Pts - a.Pts;
-      if(b.GD !== a.GD) return b.GD - a.GD;
-      if(b.GF !== a.GF) return b.GF - a.GF;
-      return a.team.localeCompare(b.team, 'ar');
-    });
-    return arr;
   }
 
-  function renderRecent(matches){
-    const tbl = qs('#tblRecent tbody');
-    const badge = qs('#matchesCount');
-    if(!tbl || !badge) return;
-    const sorted = [...matches].filter(isUpcoming).sort(sortByDateTimeAsc);
-    badge.textContent = String(sorted.length);
-    tbl.innerHTML = sorted.map(m => {
-      const score = isPlayed(m) ? `${m.score1} - ${m.score2}` : '—';
-      const link = m.match_code ? `<a href="match.html?id=${encodeURIComponent(m.match_code)}">عرض</a>` : '—';
-      return `<tr>
-        <td>${escapeHTML(m.match_code)}</td>
-        <td>${escapeHTML(m.group)}</td>
-        <td>${escapeHTML(m.date)}</td>
-        <td>${escapeHTML(m.time)}</td>
-        <td>${escapeHTML(m.team1)}</td>
-        <td class="score">${escapeHTML(score)}</td>
-        <td>${escapeHTML(m.team2)}</td>
-        <td>${link}</td>
-      </tr>`;
-    }).join('');
-  }
+  function loadVAREventsFromMatch(m){
+    // Support both: old single fields OR new var1..var4 fields
+    clearVAREventsUI();
 
-  function renderStandings(standings){
-    const tbody = qs('#tblStandings tbody');
-    const badge = qs('#grpBadge');
-    if(!tbody || !badge) return;
-    badge.textContent = String(standings.length);
-    tbody.innerHTML = standings.map((t, idx) => `
-      <tr>
-        <td>${idx+1}</td>
-        <td>${escapeHTML(t.team)}</td>
-        <td>${t.P}</td>
-        <td>${t.W}</td>
-        <td>${t.D}</td>
-        <td>${t.L}</td>
-        <td>${t.GF}</td>
-        <td>${t.GA}</td>
-        <td>${t.GD}</td>
-        <td>${t.Pts}</td>
-      </tr>
-    `).join('');
-  }
-
-  function groupMatchesByRound(matches, group){
-    const g = matches.filter(m => m.group === group);
-    const map = new Map();
-    for(const m of g){
-      const r = m.round || 'مباريات';
-      if(!map.has(r)) map.set(r, []);
-      map.get(r).push(m);
-    }
-    // sort rounds by common order (الأولى/الثانية/الثالثة) else keep
-    const order = ['الجولة الأولى','الجولة الثانية','الجولة الثالثة','الجولة الرابعة'];
-    const rounds = Array.from(map.keys()).sort((a,b) => {
-      const ia = order.indexOf(a);
-      const ib = order.indexOf(b);
-      if(ia !== -1 || ib !== -1) return (ia===-1?999:ia) - (ib===-1?999:ib);
-      return a.localeCompare(b,'ar');
-    });
-    rounds.forEach(r => map.get(r).sort((a,b) => matchKey(a).localeCompare(matchKey(b))));
-    return { rounds, map };
-  }
-
-  function renderGroupMatches(matches, group){
-    const wrap = qs('#matchesByRound');
-    const badge = qs('#matchesCount');
-    if(!wrap || !badge) return;
-    const { rounds, map } = groupMatchesByRound(matches, group);
-    const all = matches.filter(m => m.group===group);
-    badge.textContent = String(all.length);
-
-    wrap.innerHTML = rounds.map(r => {
-      const ms = map.get(r) || [];
-      const items = ms.map(m => {
-        const score = isPlayed(m) ? `${m.score1} - ${m.score2}` : '—';
-        const dt = [m.date, m.time].filter(Boolean).join(' • ');
-        const ref = [m.referee1, m.referee2].filter(Boolean).join(' / ') || '—';
-        const pom = m.player_of_match || '—';
-        const link = m.match_code ? `<a href="match.html?id=${encodeURIComponent(m.match_code)}">تفاصيل</a>` : '';
-        return `<div class="match-row">
-          <div class="pill">${escapeHTML(dt || '—')}</div>
-          <div class="dim">${escapeHTML(m.match_code || '')}</div>
-          <div>${escapeHTML(m.team1)}</div>
-          <div class="score">${escapeHTML(score)}</div>
-          <div>${escapeHTML(m.team2)}</div>
-          <div>${link}</div>
-          <div class="dim" style="grid-column: 1 / -1;">
-            حكم: ${escapeHTML(ref)} • أفضل لاعب: ${escapeHTML(pom)}
-          </div>
-        </div>`;
-      }).join('');
-      return `<div class="round">
-        <div class="round-title">${escapeHTML(r)}</div>
-        ${items || '<div class="muted">لا توجد مباريات</div>'}
-      </div>`;
-    }).join('');
-  }
-
-  function renderMatchPage(matches, matchCode){
-    const m = matches.find(x => x.match_code === matchCode);
-    if(!m){
-      showError('لم أجد هذه المباراة. تأكد من id في الرابط.');
+    const hasNew = (m.var1_team!=null || m.var1_type!=null || m.var1_result!=null);
+    if(hasNew){
+      for(let i=1;i<=4;i++){
+        const r = getVarRowEls(i);
+        if(!r.team) continue;
+        r.team.value = (m[`var${i}_team`] ?? "");
+        r.type.value = (m[`var${i}_type`] ?? "");
+        r.result.value = (m[`var${i}_result`] ?? "");
+      }
       return;
     }
-    const set = (id, val) => { const el = qs('#'+id); if(el) el.textContent = val; };
-    set('matchTitle', `${m.team1} × ${m.team2}`);
-    set('matchCode', m.match_code);
-    set('matchGroup', m.group);
-    document.body.dataset.group = m.group;
-    set('matchRound', m.round || '—');
-    set('matchDate', m.date || '—');
-    set('matchTime', m.time || '—');
 
-    const ref = [m.referee1, m.referee2].filter(Boolean).join(' / ') || '—';
-    set('matchRef', ref);
-    set('matchComm', m.commentator || '—');
-    set('matchPOM', m.player_of_match || '—');
-    // VAR
-    // Multi events support (var1..var4). If present, show summary and counts.
-    const varEvents = [];
+    // Backward: map old single var to row1
+    if(String(m.var_used||"0")==="1"){
+      const r = getVarRowEls(1);
+      if(r.team) r.team.value = (m.var_for ?? "");
+      if(r.type) r.type.value = (m.var_type ?? "");
+      if(r.result) r.result.value = (m.var_result ?? "");
+    }
+  }
+
+  function applyVAREventsToMatch(){
+    if(!current) return;
+
+    // Read 4 rows -> normalized events
+    const ev = [];
     for(let i=1;i<=4;i++){
-      const team = (m[`var${i}_team`] ?? "").trim();
-      const type = (m[`var${i}_type`] ?? "").trim();
-      const res  = (m[`var${i}_result`] ?? "").trim();
-      if(team && type && res) varEvents.push({team,type,res});
+      const r = getVarRowEls(i);
+      if(!r.team || !r.type || !r.result) continue;
+      const team = String(r.team.value||"").trim();
+      const type = String(r.type.value||"").trim();
+      const result = String(r.result.value||"").trim();
+      if(team && type && result) ev.push({team, type, result});
     }
-    if(varEvents.length){
-      const typeMap = {penalty:"ضربة جزاء", goal:"هدف", red:"بطاقة حمراء", other:"أخرى"};
-      const resMap  = {awarded:"تم احتسابه", cancelled:"أُلغي", confirmed:"تأكيد قرار الحكم"};
-      const lines = varEvents.map((e,idx)=>{
-        const who = (e.team==="team1") ? m.team1 : (e.team==="team2") ? m.team2 : "—";
-        return `${idx+1}) ${who} — ${typeMap[e.type]||"—"} — ${resMap[e.res]||"—"}`;
-      });
-      const c1 = varEvents.filter(e=>e.team==="team1").length;
-      const c2 = varEvents.filter(e=>e.team==="team2").length;
-      set('matchVAR', `VAR: ${c1}/2 — ${c2}/2<br>${lines.join("<br>")}`);
-    }else if(String(m.var_used||"0")==="1"){
-      const forTeam = (m.var_for==="team1") ? m.team1 : (m.var_for==="team2") ? m.team2 : "—";
-      const typeMap = {penalty:"ضربة جزاء", goal:"هدف", red:"بطاقة حمراء", other:"أخرى"};
-      const resMap  = {awarded:"تم احتسابه", cancelled:"أُلغي", confirmed:"تأكيد قرار الحكم"};
-      const t = typeMap[m.var_type] || "—";
-      const r = resMap[m.var_result] || "—";
-      set('matchVAR', `تم استخدام VAR — لصالح: ${forTeam} — النوع: ${t} — القرار: ${r}`);
+
+    // Store as columns for CSV
+    for(let i=1;i<=4;i++){
+      current[`var${i}_team`] = ev[i-1]?.team || "";
+      current[`var${i}_type`] = ev[i-1]?.type || "";
+      current[`var${i}_result`] = ev[i-1]?.result || "";
+    }
+
+    // Count per team (for stats + backward)
+    const c1 = ev.filter(x=>x.team==="team1").length;
+    const c2 = ev.filter(x=>x.team==="team2").length;
+    current.var_team1 = String(c1);
+    current.var_team2 = String(c2);
+
+    // Backward single fields for match page
+    if(ev.length){
+      current.var_used = "1";
+      current.var_for = ev[0].team;
+      current.var_type = ev[0].type;
+      current.var_result = ev[0].result;
     }else{
-      // fallback counters (0-2 per team)
-      const v1 = (m.var_team1===undefined || m.var_team1===null || m.var_team1==='') ? 0 : Number(m.var_team1);
-      const v2 = (m.var_team2===undefined || m.var_team2===null || m.var_team2==='') ? 0 : Number(m.var_team2);
-      set('matchVAR', `الفريق 1: ${isNaN(v1)?0:v1}/2 — الفريق 2: ${isNaN(v2)?0:v2}/2`);
+      current.var_used = "0";
+      current.var_for = "";
+      current.var_type = "";
+      current.var_result = "";
+    }
+  }
+
+  // ====== UI ======
+  function setMsg(id, text, isError=false){
+    const el = qs(id);
+    if(!el) return;
+    el.textContent = text;
+    el.classList.remove("hidden");
+    if(isError) el.style.background = "rgba(255,0,0,.15)";
+  }
+
+  function hideMsg(id){
+    const el = qs(id);
+    if(el) el.classList.add("hidden");
+  }
+
+  function fillSelect(el, items, placeholder) {
+    if (typeof el === "string") el = qs(el);
+    if (!el) return;
+    el.innerHTML = '';
+    const o0 = document.createElement('option');
+    o0.value = '';
+    o0.textContent = placeholder || '—';
+    el.appendChild(o0);
+
+    (items || []).forEach(it => {
+      const o = document.createElement('option');
+      if (typeof it === 'string') {
+        o.value = it;
+        o.textContent = it;
+      } else {
+        o.value = (it && it.value != null) ? String(it.value) : '';
+        o.textContent = (it && it.label != null) ? String(it.label) : String(it.value || '');
+      }
+      el.appendChild(o);
+    });
+  }
+
+  function ensureOption(el, value){
+    if (typeof el === "string") el = qs(el);
+    if(!el) return;
+    const v = String(value||'').trim();
+    if(!v) return;
+    const exists = Array.from(el.options||[]).some(o=>o.value===v);
+    if(!exists){
+      const o=document.createElement('option');
+      o.value=v; o.textContent=v;
+      el.appendChild(o);
+    }
+    el.value = v;
+  }
+
+  function getAllTeams(){
+    const set = new Set();
+    try{ Object.keys(roster||{}).forEach(t=> set.add(String(t).trim())); }catch(e){}
+    (matches||[]).forEach(m=>{
+      ['team1','team2'].forEach(k=>{
+        const v = String((m && m[k]) || '').trim();
+        if(v && v !== 'x' && v !== 'X' && v !== '-') set.add(v);
+      });
+    });
+    return Array.from(set).filter(Boolean).sort((a,b)=>a.localeCompare(b,'ar'));
+  }
+
+  function isKnockoutMatch(m){
+    const code = String((m && (m.match_code || m.code)) || '').toUpperCase().trim();
+    return /^(QF|SF|TP|F)/.test(code);
+  }
+
+  function setupKOTeamsUI(m){
+    const box = qs('#koTeams');
+    const s1  = qs('#team1Sel');
+    const s2  = qs('#team2Sel');
+    if(!box || !s1 || !s2) return;
+
+    if(!m || !isKnockoutMatch(m)){
+      box.style.display='none';
+      return;
     }
 
-
-    const score = isPlayed(m) ? `${m.score1} - ${m.score2}` : 'لم تُلعب بعد';
-    const scoreLine = qs('#scoreLine');
-    if(scoreLine) scoreLine.textContent = `${m.team1}  ${score}  ${m.team2}`;
-
-    const back = qs('#backToGroup');
-    if(back) back.href = `group.html?g=${encodeURIComponent(m.group)}`;
-
-    const goals1 = qs('#goals1');
-    const goals2 = qs('#goals2');
-    if(goals1) goals1.innerHTML = renderGoalsList(m.goals_team1);
-    if(goals2) goals2.innerHTML = renderGoalsList(m.goals_team2);
-
-    const y1 = qs('#yellows1');
-    const r1 = qs('#reds1');
-    const y2 = qs('#yellows2');
-    const r2 = qs('#reds2');
-    if(y1) y1.innerHTML = renderGoalsList(m.yellow_team1);
-    if(r1) r1.innerHTML = renderGoalsList(m.red_team1);
-    if(y2) y2.innerHTML = renderGoalsList(m.yellow_team2);
-    if(r2) r2.innerHTML = renderGoalsList(m.red_team2);
+    box.style.display='block';
+    const teams = getAllTeams();
+    fillSelect(s1, teams, 'اختر الفريق 1');
+    fillSelect(s2, teams, 'اختر الفريق 2');
+    if(String(m.team1||'').trim() && String(m.team1||'').trim().toLowerCase()!=='x') s1.value = m.team1;
+    if(String(m.team2||'').trim() && String(m.team2||'').trim().toLowerCase()!=='x') s2.value = m.team2;
+  }
+  function setStatus(text){
+    const el = qs("#dataStatus");
+    if(el) el.textContent = text;
   }
 
-  function renderGoalsList(text){
-    const s = (text || '').trim();
-    if(!s) return '<li class="muted">—</li>';
-    // split by ; or newline
-    const parts = s.split(/;|\n|,|،|\||\/+/).map(x => x.trim()).filter(Boolean);
-    return parts.map(p => `<li>${escapeHTML(formatGoalItem(p))}</li>`).join('');
+  function updatePreview(){
+    qs("#goalsPreview1").textContent = formatListFromMap(goalsMap1) || "—";
+    qs("#goalsPreview2").textContent = formatListFromMap(goalsMap2) || "—";
+    const c1 = [];
+    const y1 = formatListFromMap(yellowMap1);
+    const r1 = formatListFromMap(redMap1);
+    if(y1) c1.push("🟨 " + y1);
+    if(r1) c1.push("🟥 " + r1);
+    qs("#cardsPreview1").textContent = c1.length ? c1.join(" | ") : "—";
+
+    const c2 = [];
+    const y2 = formatListFromMap(yellowMap2);
+    const r2 = formatListFromMap(redMap2);
+    if(y2) c2.push("🟨 " + y2);
+    if(r2) c2.push("🟥 " + r2);
+    qs("#cardsPreview2").textContent = c2.length ? c2.join(" | ") : "—";
   }
 
+  function buildCSV(){
+    // Ensure required columns exist
+    const required = [
+      "match_code","group","round","date","time","team1","team2","score1","score2",
+      "referee1","referee2","commentator","player_of_match",
+      "goals_team1","goals_team2","var_team1","var_team2","var_used","var_for","var_type","var_result",
+      "yellow_team1","red_team1","yellow_team2","red_team2"
+    ];
+    required.forEach(h => { if(!headers.includes(h)) headers.push(h); });
 
-  function formatGoalItem(p){
-    const t = String(p||'').trim();
-    if(!t) return '';
-    // normalize common minute notations: "Name 12" -> "Name (12')"
-    const m = t.match(/^(.*?)(?:\s*[\-:()]*\s*)(\d{1,3})(?:\s*['’]|\s*د|\s*min)?\s*$/);
-    if(m && m[1] && m[2]){
-      const name = m[1].trim().replace(/[\-:()]+$/,'').trim();
-      const minute = m[2].trim();
-      if(name) return `${name} (${minute}')`;
+    const lines = [];
+    lines.push(headers.join(","));
+    for(const m of matches){
+      const row = headers.map(h => escapeCSV(m[h] ?? ""));
+      lines.push(row.join(","));
     }
-    return t;
+    return lines.join("\n");
   }
 
-  function escapeHTML(str){
-    return String(str ?? '')
-      .replaceAll('&','&amp;')
-      .replaceAll('<','&lt;')
-      .replaceAll('>','&gt;')
-      .replaceAll('"','&quot;')
-      .replaceAll("'",'&#39;');
+  function refreshCSVOut(){
+    const out = buildCSV();
+    qs("#csvOut").value = out;
   }
 
-  async function initIndex(){
-    const matches = await loadMatches();
-    renderRecent(matches);
+  function setupMatchDropdown(){
+    const list = matches
+      .map(m => ({
+        id: m.match_code || "",
+        label: `${m.match_code || ""} — ${m.group || ""} — ${(m.team1||"")} × ${(m.team2||"")}`
+      }))
+      .filter(x => x.id);
+    const sel = qs("#matchSelect");
+    sel.innerHTML = "";
+    list.forEach(x => {
+      const o = document.createElement("option");
+      o.value = x.id;
+      o.textContent = x.label;
+      sel.appendChild(o);
+    });
   }
 
-  async function initGroup(){
-    const g = (getParam('g') || 'A').toUpperCase();
-    const sub = qs('#pageSub'); if(sub) sub.textContent = `المجموعة ${g}`;
-    const title = qs('#grpTitle'); if(title) title.textContent = `الترتيب — المجموعة ${g}`;
-    const matches = await loadMatches();
-    const standings = computeStandings(matches, g);
-    renderStandings(standings);
-    renderGroupMatches(matches, g);
+  function rosterPlayers(team){
+    const t = roster[team];
+    if(!t) return [];
+    const arr = Array.isArray(t) ? t : (t.players || []);
+    return arr
+      .filter(p => p && p.name)
+      .map(p => ({
+        value: p.name,
+        label: (p.number ? (p.number + ' — ' + p.name) : p.name)
+      }));
   }
 
   
-  async function initStage(stageCode, titleText){
-    const code = String(stageCode || "").toUpperCase();
-    const sub = qs('#pageSub'); if(sub) sub.textContent = titleText || code;
-    const title = qs('#stageTitle'); if(title) title.textContent = titleText || code;
-    const matches = await loadMatches();
-    // stage matches are those whose group equals stageCode (e.g., QF/SF/TP/F)
-    const stageMatches = matches.filter(m => (m.group||"").toUpperCase() === code);
-    const cnt = qs('#matchesCount'); if(cnt) cnt.textContent = String(stageMatches.length);
-    renderGroupMatches(stageMatches, code); // renders into #matchesByRound
+  // ====== Searchable selects (players) ======
+  function makeSelectSearchable(inputSel, selectSel){
+    const inp = (typeof inputSel==="string") ? qs(inputSel) : inputSel;
+    const sel = (typeof selectSel==="string") ? qs(selectSel) : selectSel;
+    if(!inp || !sel) return;
+
+    // snapshot original options (except placeholder)
+    let snapshot = [];
+    function takeSnapshot(){
+      snapshot = Array.from(sel.options).map(o => ({value:o.value, text:o.textContent}));
+    }
+    function restore(){
+      sel.innerHTML = "";
+      snapshot.forEach((o,idx)=>{
+        const opt = document.createElement("option");
+        opt.value = o.value;
+        opt.textContent = o.text;
+        sel.appendChild(opt);
+      });
+    }
+
+    takeSnapshot();
+
+    inp.addEventListener("input", ()=>{
+      const q = String(inp.value||"").trim().toLowerCase();
+      restore();
+      if(q.length < 2) return;
+
+      // keep placeholder first option
+      const opts = Array.from(sel.options);
+      const keep0 = opts.shift();
+      const filtered = opts.filter(o => o.textContent.toLowerCase().includes(q));
+      sel.innerHTML = "";
+      if(keep0) sel.appendChild(keep0);
+      filtered.forEach(o=>sel.appendChild(o));
+    });
+
+    // when select options are re-filled, update snapshot
+    sel.addEventListener("mbz:refill", ()=>{ takeSnapshot(); });
+  }
+function setupPlayerDropdowns(){
+    if(!current) return;
+    const team1 = current.team1 || "";
+    const team2 = current.team2 || "";
+    const p1 = rosterPlayers(team1);
+    const p2 = rosterPlayers(team2);
+
+    fillSelect("#player", p1.concat(p2), "اختر لاعب");
+    qs("#player")?.dispatchEvent(new Event("mbz:refill"));
+    fillSelect("#pom", p1.concat(p2), "أفضل لاعب");
+    qs("#pom")?.dispatchEvent(new Event("mbz:refill"));
+
+    fillSelect("#cardPlayer", p1.concat(p2), "اختر لاعب");
+    qs("#cardPlayer")?.dispatchEvent(new Event("mbz:refill"));
+
+    // Side select: team1/team2
+    fillSelect("#side", [`الفريق 1 — ${team1}`, `الفريق 2 — ${team2}`], "اختر الفريق");
+    fillSelect("#cardSide", [`الفريق 1 — ${team1}`, `الفريق 2 — ${team2}`], "اختر الفريق");
   }
 
-  async function initKnockout(){
-    // Nothing dynamic; page is static links
-    return;
+  function setupStaffDropdowns(){
+    const refs = uniq(matches.flatMap(m => [m.referee1, m.referee2]));
+    const comms = uniq(matches.map(m => m.commentator));
+    fillSelect("#ref1", refs, "حكم 1");
+    fillSelect("#ref2", refs, "حكم 2");
+    fillSelect("#commentator", comms, "معلق");
   }
 
-  async function initMatch(){
-    const id = getParam('id');
-    const matches = await loadMatches();
-    renderMatchPage(matches, id);
+  function loadMatchById(id){
+    const m = matches.find(x => (x.match_code||"") === id);
+    if(!m) { setMsg("#panelMsg", "لم أجد هذه المباراة.", true); return; }
+    current = m;
+    hideMsg("#panelMsg");
+
+    // snapshot (for reset)
+    originalSnapshot = JSON.stringify(m);
+
+    // Fill basic fields
+    qs("#score1").value = (m.score1 ?? "");
+    qs("#score2").value = (m.score2 ?? "");
+    // VAR (multi events)
+    loadVAREventsFromMatch(m);
+
+    setupStaffDropdowns();
+
+    setSelectOrManual("#ref1", "#ref1_manual", (m.referee1 ?? ""));
+    setSelectOrManual("#ref2", "#ref2_manual", (m.referee2 ?? ""));
+    setSelectOrManual("#commentator", "#commentator_manual", (m.commentator ?? ""));
+
+    // roster-based dropdowns
+    setupPlayerDropdowns();
+    qs("#pom").value = (m.player_of_match ?? "");
+
+    // Parse scorers/cards into maps
+    goalsMap1 = parseListToMap(m.goals_team1 || "");
+    goalsMap2 = parseListToMap(m.goals_team2 || "");
+    yellowMap1 = parseListToMap(m.yellow_team1 || "");
+    redMap1 = parseListToMap(m.red_team1 || "");
+    yellowMap2 = parseListToMap(m.yellow_team2 || "");
+    redMap2 = parseListToMap(m.red_team2 || "");
+    history = [];
+    updatePreview();
+
+    // meta
+    const meta = `${m.group || ""} • الجولة: ${m.round || ""} • ${m.date || ""} • ${m.time || ""}<br>${m.team1 || ""} × ${m.team2 || ""}`;
+    qs("#matchMeta").innerHTML = meta;
+
+    // KO teams UI (QF/SF/TP/F)
+    setupKOTeamsUI(m);
+
+    setStatus("جاهز");
   }
 
-  return { initIndex, initGroup, initMatch, initStage, initKnockout };
+  function applyMapsToCurrent(){
+    if(!current) return;
+    applyVAREventsToMatch();
+    current.goals_team1 = formatListFromMap(goalsMap1);
+    current.goals_team2 = formatListFromMap(goalsMap2);
+    current.yellow_team1 = formatListFromMap(yellowMap1);
+    current.red_team1 = formatListFromMap(redMap1);
+    current.yellow_team2 = formatListFromMap(yellowMap2);
+    current.red_team2 = formatListFromMap(redMap2);
+  }
+
+  function saveRow(){
+    if(!current) return;
+    current.score1 = qs("#score1").value.trim();
+    current.score2 = qs("#score2").value.trim();
+    // VAR handled by applyVAREventsToMatch()
+
+    // Backward-compatible counters used by UI badges (0/1)
+    current.var_team1 = (current.var_used === "1" && current.var_for === "team1") ? "1" : "0";
+    current.var_team2 = (current.var_used === "1" && current.var_for === "team2") ? "1" : "0";
+    current.referee1 = getSelectOrManual("#ref1", "#ref1_manual");
+    current.referee2 = getSelectOrManual("#ref2", "#ref2_manual");
+    current.commentator = getSelectOrManual("#commentator", "#commentator_manual");
+    current.player_of_match = qs("#pom").value.trim();
+
+    applyMapsToCurrent();
+    refreshCSVOut();
+    setMsg("#panelMsg", "تم حفظ التعديلات داخل اللوحة. الآن نزّل matches.csv وارفعه إلى GitHub.", false);
+  }
+
+  function resetRow(){
+    if(!current) return;
+    const snap = JSON.parse(originalSnapshot || "{}");
+    Object.keys(snap).forEach(k => current[k] = snap[k]);
+    loadMatchById(current.match_code);
+    refreshCSVOut();
+    hideMsg("#panelMsg");
+  }
+
+  function sideToIndex(sideText){
+    if(!sideText) return null;
+    return sideText.startsWith("الفريق 2") ? 2 : 1;
+  }
+
+  function addGoal(){
+    if(!current) return;
+    const side = qs("#side").value;
+    const manual = (qs('#player_manual')?.value || '').trim();
+    const picked = (qs('#player')?.value || '').trim();
+    const name = manual || picked;
+    if(!side || !name) return;
+    if(manual) ensureOption('#player', manual);
+    const idx = sideToIndex(side);
+    const map = idx===1 ? goalsMap1 : goalsMap2;
+    map[name] = (map[name]||0) + 1;
+    history.push({type:"goal", idx, name});
+    updatePreview();
+  }
+
+  function undoGoal(){
+    for(let i=history.length-1;i>=0;i--){
+      const h = history[i];
+      if(h.type==="goal"){
+        const map = h.idx===1 ? goalsMap1 : goalsMap2;
+        map[h.name] = Math.max(0, (map[h.name]||0)-1);
+        if(map[h.name]===0) delete map[h.name];
+        history.splice(i,1);
+        break;
+      }
+    }
+    updatePreview();
+  }
+
+  function clearGoals(){
+    goalsMap1 = {}; goalsMap2 = {};
+    history = history.filter(h => h.type!=="goal");
+    updatePreview();
+  }
+
+  function addCard(cardType){
+    if(!current) return;
+    const side = qs("#cardSide").value;
+    const manual = (qs('#cardPlayer_manual')?.value || '').trim();
+    const picked = (qs('#cardPlayer')?.value || '').trim();
+    const name = manual || picked;
+    if(!side || !name) return;
+    if(manual) ensureOption('#cardPlayer', manual);
+    const idx = sideToIndex(side);
+    const isYellow = cardType==="yellow";
+    const map = idx===1 ? (isYellow?yellowMap1:redMap1) : (isYellow?yellowMap2:redMap2);
+    map[name] = (map[name]||0) + 1;
+    history.push({type:"card", idx, name, cardType});
+    updatePreview();
+  }
+
+  function undoCard(){
+    for(let i=history.length-1;i>=0;i--){
+      const h = history[i];
+      if(h.type==="card"){
+        const isYellow = h.cardType==="yellow";
+        const map = h.idx===1 ? (isYellow?yellowMap1:redMap1) : (isYellow?yellowMap2:redMap2);
+        map[h.name] = Math.max(0, (map[h.name]||0)-1);
+        if(map[h.name]===0) delete map[h.name];
+        history.splice(i,1);
+        break;
+      }
+    }
+    updatePreview();
+  }
+
+  function clearCards(){
+    yellowMap1 = {}; redMap1 = {}; yellowMap2 = {}; redMap2 = {};
+    history = history.filter(h => h.type!=="card");
+    updatePreview();
+  }
+
+  function downloadCSV(){
+    const text = qs("#csvOut").value || buildCSV();
+    const blob = new Blob([text], { type:"text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "matches.csv";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 250);
+  }
+
+  async function copyCSV(){
+    const text = qs("#csvOut").value || buildCSV();
+    try{
+      await navigator.clipboard.writeText(text);
+      setMsg("#panelMsg","تم نسخ CSV. الآن افتح GitHub والصقه داخل data/matches.csv ثم Commit.", false);
+    }catch{
+      setMsg("#panelMsg","لم أستطع النسخ تلقائيًا. استخدم مربع النص وانسخ يدويًا.", true);
+    }
+  }
+
+  // ====== Boot ======
+  async function init(){
+    // Gate
+    qs("#btnLogin").addEventListener("click", () => {
+      const pin = qs("#pin").value.trim();
+      if(pin === ADMIN_PIN){
+        qs("#gate").classList.add("hidden");
+        qs("#panel").classList.remove("hidden");
+        startPanel().catch(err => setMsg("#panelMsg", String(err), true));
+      }else{
+        setMsg("#gateMsg", "PIN غير صحيح.", true);
+      }
+    });
+
+    qs("#pin").addEventListener("keydown", (e) => {
+      if(e.key === "Enter") qs("#btnLogin").click();
+    });
+  }
+
+  
+    // Awards panel
+    function setupAwardsPanel() {
+      const elJson = document.querySelector("#awardsJson");
+      const btnSave = document.querySelector("#btnSaveAwards");
+      const btnDl = document.querySelector("#btnDownloadAwards");
+      if (!elJson || !btnSave || !btnDl) return;
+
+      const teams = Object.keys(roster || {});
+      const players = (staffAll || []).filter(x => (x.role || "").includes("لاعب")).map(x => ({ value: x.name, label: `${x.name} — ${x.team}` }));
+      const admins = (staffAll || []).filter(x => (x.role || "").includes("إداري")).map(x => ({ value: x.name, label: `${x.name} — ${x.team}` }));
+
+      const teamOpts = teams.map(t => ({ value: t, label: t }));
+      fillSelect("#aw_champion_team", teamOpts, "اختر الفريق");
+      fillSelect("#aw_runnerup_team", teamOpts, "اختر الفريق");
+      fillSelect("#aw_third_team", teamOpts, "اختر الفريق");
+      fillSelect("#aw_fourth_team", teamOpts, "اختر الفريق");
+
+      fillSelect("#aw_top_scorer", players, "اختر لاعب");
+      fillSelect("#aw_best_player", players, "اختر لاعب");
+      fillSelect("#aw_best_keeper", players, "اختر لاعب");
+      fillSelect("#aw_best_admin", admins.length ? admins : players, "اختر إداري");
+
+      // load existing from localStorage
+      try {
+        const saved = localStorage.getItem("mbz_awards");
+        if (saved) {
+          awards = JSON.parse(saved);
+          if (awards && awards.teams) {
+            document.querySelector("#aw_champion_team").value = awards.teams.champion || "";
+            document.querySelector("#aw_runnerup_team").value = awards.teams.runnerup || "";
+            document.querySelector("#aw_third_team").value = awards.teams.third || "";
+            document.querySelector("#aw_fourth_team").value = awards.teams.fourth || "";
+          }
+          if (awards && awards.individual) {
+            document.querySelector("#aw_top_scorer").value = awards.individual.top_scorer?.name || "";
+            document.querySelector("#aw_best_player").value = awards.individual.best_player?.name || "";
+            document.querySelector("#aw_best_keeper").value = awards.individual.best_keeper?.name || "";
+            document.querySelector("#aw_best_admin").value = awards.individual.best_admin?.name || "";
+          }
+        }
+      } catch(e) {}
+
+      function buildAwards() {
+        const champion = document.querySelector("#aw_champion_team").value || "";
+        const runnerup = document.querySelector("#aw_runnerup_team").value || "";
+        const third = document.querySelector("#aw_third_team").value || "";
+        const fourth = document.querySelector("#aw_fourth_team").value || "";
+
+        const topScorer = document.querySelector("#aw_top_scorer").value || "";
+        const bestPlayer = document.querySelector("#aw_best_player").value || "";
+        const bestKeeper = document.querySelector("#aw_best_keeper").value || "";
+        const bestAdmin = document.querySelector("#aw_best_admin").value || "";
+
+        const lookup = (name) => (staffAll || []).find(x => x.name === name) || null;
+
+        return {
+          updated_at: new Date().toISOString(),
+          teams: { champion, runnerup, third, fourth },
+          individual: {
+            top_scorer: topScorer ? { name: topScorer, team: lookup(topScorer)?.team || "" } : { name: "", team: "" },
+            best_player: bestPlayer ? { name: bestPlayer, team: lookup(bestPlayer)?.team || "" } : { name: "", team: "" },
+            best_keeper: bestKeeper ? { name: bestKeeper, team: lookup(bestKeeper)?.team || "" } : { name: "", team: "" },
+            best_admin: bestAdmin ? { name: bestAdmin, team: lookup(bestAdmin)?.team || "" } : { name: "", team: "" }
+          }
+        };
+      }
+
+      function refreshJson() {
+        awards = buildAwards();
+        elJson.value = JSON.stringify(awards, null, 2);
+      }
+
+      btnSave.addEventListener("click", () => {
+        refreshJson();
+        try { localStorage.setItem("mbz_awards", elJson.value); } catch(e) {}
+        alert("تم حفظ الجوائز داخل اللوحة.");
+      });
+
+      btnDl.addEventListener("click", () => {
+        refreshJson();
+        downloadText("awards.json", elJson.value);
+      });
+
+      // initial
+      refreshJson();
+    }
+
+async function startPanel(){
+    setStatus("تحميل…");
+    // Load roster
+    const rosterText = await fetchText("data/roster.json");
+    roster = JSON.parse(rosterText);
+
+    // Load matches
+    const csvText = await fetchText("data/matches.csv");
+    const rows = parseCSV(csvText);
+
+    headers = Object.keys(rows[0] || {});
+    // Ensure required headers exist
+    const must = ["var_used","var_for","var_type","var_result","var_team1","var_team2",
+      "var1_team","var1_type","var1_result","var2_team","var2_type","var2_result","var3_team","var3_type","var3_result","var4_team","var4_type","var4_result"];
+    must.forEach(h=>{ if(!headers.includes(h)) headers.push(h); });
+    matches = rows;
+
+    // Ensure match_code exists
+    matches = matches.filter(m => (m.match_code||"").trim() !== "");
+
+    setupMatchDropdown();
+    // Bind player search inputs (type 2 letters)
+    makeSelectSearchable("#playerSearch", "#player");
+    makeSelectSearchable("#pomSearch", "#pom");
+    makeSelectSearchable("#cardSearch", "#cardPlayer");
+    refreshCSVOut();
+    setStatus("جاهز");
+
+    // Default load first match
+    const firstId = qs("#matchSelect").value;
+    if(firstId) loadMatchById(firstId);
+
+    // Allow manual entry for referees/commentator:
+    // - if user selects from dropdown, clear manual
+    // - if user types manual, clear dropdown selection
+    const clearOnSelect = (sel, man) => {
+      const s = qs(sel), m = qs(man);
+      if(!s || !m) return;
+      s.addEventListener("change", ()=>{ m.value = ""; });
+    };
+    const clearOnManual = (man, sel) => {
+      const m = qs(man), s = qs(sel);
+      if(!m || !s) return;
+      m.addEventListener("input", ()=>{
+        if(m.value.trim()) s.value = "";
+      });
+    };
+    clearOnSelect("#ref1", "#ref1_manual");
+    clearOnSelect("#ref2", "#ref2_manual");
+    clearOnSelect("#commentator", "#commentator_manual");
+    clearOnManual("#ref1_manual", "#ref1");
+    clearOnManual("#ref2_manual", "#ref2");
+    clearOnManual("#commentator_manual", "#commentator");
+
+    // Wire buttons
+    qs("#btnLoadMatch").addEventListener("click", () => loadMatchById(qs("#matchSelect").value));
+
+    // KO teams save (QF/SF/TP/F)
+    const btnSaveTeams = qs('#btnSaveTeams');
+    if(btnSaveTeams){
+      btnSaveTeams.addEventListener('click', ()=>{
+        if(!current) return;
+        const t1 = (qs('#team1Sel')?.value || '').trim();
+        const t2 = (qs('#team2Sel')?.value || '').trim();
+        current.team1 = t1 || current.team1 || 'x';
+        current.team2 = t2 || current.team2 || 'x';
+        // refresh meta + player dropdowns
+        const meta = `${current.group || ""} • الجولة: ${current.round || ""} • ${current.date || ""} • ${current.time || ""}<br>${current.team1 || ""} × ${current.team2 || ""}`;
+        qs('#matchMeta').innerHTML = meta;
+        setupPlayerDropdowns();
+        fillMatchSelect();
+        toast('تم تثبيت الفرق (لا تنسَ تحميل matches.csv)');
+      });
+    }
+    qs("#btnSaveRow").addEventListener("click", saveRow);
+    qs("#btnResetRow").addEventListener("click", resetRow);
+
+    qs("#btnGoal").addEventListener("click", addGoal);
+    const btnUseManualGoal = qs('#btnUseManualGoal');
+    if(btnUseManualGoal){
+      btnUseManualGoal.addEventListener('click', ()=>{
+        const v = (qs('#player_manual')?.value || '').trim();
+        if(!v) return;
+        ensureOption('#player', v);
+        toast('تم إدراج اللاعب يدويًا');
+      });
+    }
+    qs("#btnUndoGoal").addEventListener("click", undoGoal);
+    qs("#btnClearGoals").addEventListener("click", clearGoals);
+
+    qs("#btnYellow").addEventListener("click", () => addCard("yellow"));
+    qs("#btnRed").addEventListener("click", () => addCard("red"));
+    const btnUseManualCard = qs('#btnUseManualCard');
+    if(btnUseManualCard){
+      btnUseManualCard.addEventListener('click', ()=>{
+        const v = (qs('#cardPlayer_manual')?.value || '').trim();
+        if(!v) return;
+        ensureOption('#cardPlayer', v);
+        toast('تم إدراج اللاعب يدويًا');
+      });
+    }
+    qs("#btnUndoCard").addEventListener("click", undoCard);
+    qs("#btnClearCards").addEventListener("click", clearCards);
+
+    qs("#btnDownload").addEventListener("click", downloadCSV);
+    qs("#btnCopy").addEventListener("click", copyCSV);
+  }
+
+  document.addEventListener("DOMContentLoaded", ()=>{ init(); try{ setupAwardsPanel(); }catch(e){ console.error(e);} });
 })();
