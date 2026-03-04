@@ -84,34 +84,24 @@ select option{color:#000;background:#fff;}
           </div>
           <div class="hint" id="matchMeta" style="margin-top:8px"></div>
 
-          <!-- KO Teams + Team Pool (for QF/SF/F/TP only) -->
-          <div class="box hidden" id="koBox" style="border:1px dashed rgba(255,255,255,.35)">
-            <div class="hint" style="margin-bottom:8px">
-              <b>الأدوار النهائية:</b> اختر الفريقين من القائمة (16 فريق). يمكنك استبعاد الفرق التي خرجت لتسهيل الاختيار، وإضافة فريق بالخطأ إن لزم.
+          <!-- KO Team assignment (QF/SF/TP/F only) -->
+          <div id="koTeams" class="note" style="margin-top:10px; display:none;">
+            <div style="font-weight:800; margin-bottom:8px;">تثبيت فرق الأدوار النهائية (بعد القرعة)</div>
+            <div class="row" style="gap:10px; flex-wrap:wrap;">
+              <div style="flex:1; min-width:220px;">
+                <div class="hint">الفريق 1</div>
+                <select id="team1Sel"></select>
+              </div>
+              <div style="flex:1; min-width:220px;">
+                <div class="hint">الفريق 2</div>
+                <select id="team2Sel"></select>
+              </div>
+              <div style="min-width:160px; align-self:flex-end;">
+                <button class="btn btn-gb small" id="btnSaveTeams" style="width:100%;">حفظ الفرق</button>
+              </div>
             </div>
-            <div class="row">
-              <select id="ko_team1"></select>
-              <select id="ko_team2"></select>
-            </div>
-
-            <div style="height:8px"></div>
-            <div class="row">
-              <select id="poolTeam"></select>
-              <button class="btn small" id="btnExcludeTeam" type="button">استبعاد</button>
-              <button class="btn btn-gb small" id="btnResetPool" type="button">إعادة ضبط</button>
-            </div>
-
-            <div style="height:8px"></div>
-            <div class="row">
-              <input id="addTeamName" placeholder="إضافة فريق (اختياري)" />
-              <button class="btn small" id="btnAddTeam" type="button">إضافة</button>
-            </div>
-
-            <div class="hint" style="margin-top:8px">
-              ملاحظة: الاستبعاد/الإضافة محفوظة على هذا الجهاز فقط.
-            </div>
+            <div class="hint" style="margin-top:8px;">يظهر هذا القسم فقط عند اختيار مباراة QF / SF / TP / F.</div>
           </div>
-
 
           <div style="height:10px"></div>
           <div class="row">
@@ -255,6 +245,11 @@ select option{color:#000;background:#fff;}
             <select id="player"></select>
             <button class="btn btn-ga small" id="btnGoal">+ هدف</button>
           </div>
+
+          <div class="row" style="margin-top:6px">
+            <input id="player_manual" class="pill" placeholder="إذا اللاعب غير موجود بالقائمة: اكتب اسمه هنا" style="flex:1;min-width:220px" />
+            <button class="btn btn-gb small" id="btnUseManualGoal">استخدم الاسم اليدوي</button>
+          </div>
           <div class="row">
             <button class="btn btn-gb small" id="btnUndoGoal">تراجع آخر هدف</button>
             <button class="btn btn-gc small" id="btnClearGoals">مسح الهدافين</button>
@@ -268,6 +263,11 @@ select option{color:#000;background:#fff;}
             <select id="cardPlayer"></select>
             <button class="btn btn-gb small" id="btnYellow">🟨 أصفر</button>
             <button class="btn btn-gd small" id="btnRed">🟥 أحمر</button>
+          </div>
+
+          <div class="row" style="margin-top:6px">
+            <input id="cardPlayer_manual" class="pill" placeholder="إذا اللاعب غير موجود بالقائمة: اكتب اسمه هنا" style="flex:1;min-width:220px" />
+            <button class="btn btn-gb small" id="btnUseManualCard">استخدم الاسم اليدوي</button>
           </div>
           <div class="row">
             <button class="btn btn-gc small" id="btnUndoCard">تراجع آخر كرت</button>
