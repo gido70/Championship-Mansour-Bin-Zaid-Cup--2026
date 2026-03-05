@@ -155,6 +155,29 @@ function optionExists(sel, value){
     return sel ? sel.value.trim() : "";
   }
 
+  // ✅ NEW: typed-player fallback for goals/cards when not in dropdown
+  function ensureOptionSelected(selectEl, name){
+    const v = String(name||"").trim();
+    if(!selectEl || !v) return "";
+    if(!optionExists(selectEl, v)){
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      selectEl.appendChild(opt);
+    }
+    selectEl.value = v;
+    return v;
+  }
+
+  function getSelectOrTyped(selectSel, typedSel){
+    const sel = qs(selectSel);
+    const picked = sel ? sel.value.trim() : "";
+    if(picked) return picked;
+    const typed = qs(typedSel) ? qs(typedSel).value.trim() : "";
+    if(!typed) return "";
+    return ensureOptionSelected(sel, typed);
+  }
+
   function formatListFromMap(map){
     // map: name -> count
     const items = Object.entries(map)
@@ -563,13 +586,15 @@ function setupPlayerDropdowns(){
   function addGoal(){
     if(!current) return;
     const side = qs("#side").value;
-    const name = qs("#player").value.trim();
+    const name = getSelectOrTyped("#player", "#playerSearch");
     if(!side || !name) return;
     const idx = sideToIndex(side);
     const map = idx===1 ? goalsMap1 : goalsMap2;
     map[name] = (map[name]||0) + 1;
     history.push({type:"goal", idx, name});
     updatePreview();
+
+    if(qs('#playerSearch')) qs('#playerSearch').value = '';
   }
 
   function undoGoal(){
@@ -595,7 +620,7 @@ function setupPlayerDropdowns(){
   function addCard(cardType){
     if(!current) return;
     const side = qs("#cardSide").value;
-    const name = qs("#cardPlayer").value.trim();
+    const name = getSelectOrTyped("#cardPlayer", "#cardSearch");
     if(!side || !name) return;
     const idx = sideToIndex(side);
     const isYellow = cardType==="yellow";
@@ -603,6 +628,8 @@ function setupPlayerDropdowns(){
     map[name] = (map[name]||0) + 1;
     history.push({type:"card", idx, name, cardType});
     updatePreview();
+
+    if(qs('#cardSearch')) qs('#cardSearch').value = '';
   }
 
   function undoCard(){
