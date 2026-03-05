@@ -79,6 +79,41 @@
     try{ localStorage.setItem(TEAM_POOL_KEY, JSON.stringify(teamPool)); }catch(e){}
   }
 
+  // --- Extra players (manual add) persisted in localStorage ---
+  function loadExtraPlayers(){
+    try{ return JSON.parse(localStorage.getItem('mbz_extra_players') || '{}') || {}; }catch(e){ return {}; }
+  }
+  function saveExtraPlayers(obj){
+    try{ localStorage.setItem('mbz_extra_players', JSON.stringify(obj || {})); }catch(e){}
+  }
+  function mergeExtraPlayersIntoRoster(){
+    const ex = loadExtraPlayers();
+    Object.keys(ex||{}).forEach(team=>{
+      const names = (ex[team]||[]).map(s=>String(s||'').trim()).filter(Boolean);
+      if(!names.length) return;
+      if(!roster[team]) roster[team] = { group:'', players:[] };
+      roster[team].players = roster[team].players || [];
+      const existing = new Set((roster[team].players||[]).map(p=>String((p&&p.name)||'').trim()));
+      names.forEach(n=>{
+        if(existing.has(n)) return;
+        roster[team].players.push({ number:'', name:n });
+        existing.add(n);
+      });
+    });
+  }
+  function rememberExtraPlayer(teamName, playerName){
+    teamName = String(teamName||'').trim();
+    playerName = String(playerName||'').trim();
+    if(!teamName || !playerName) return;
+    const ex = loadExtraPlayers();
+    ex[teamName] = ex[teamName] || [];
+    if(!ex[teamName].includes(playerName)){
+      ex[teamName].push(playerName);
+      saveExtraPlayers(ex);
+    }
+  }
+
+
   function isKOMatch(m){
     const code = String(m?.match_code||"").toUpperCase();
     const g = String(m?.group||"").toUpperCase();
@@ -563,7 +598,7 @@ function setupPlayerDropdowns(){
   function addGoal(){
     if(!current) return;
     const side = qs("#side").value;
-    const name = qs("#player").value.trim();
+    const name = setSelectOrManual("player","player_manual");
     if(!side || !name) return;
     const idx = sideToIndex(side);
     const map = idx===1 ? goalsMap1 : goalsMap2;
@@ -595,7 +630,7 @@ function setupPlayerDropdowns(){
   function addCard(cardType){
     if(!current) return;
     const side = qs("#cardSide").value;
-    const name = qs("#cardPlayer").value.trim();
+    const name = setSelectOrManual("cardPlayer","cardPlayer_manual");
     if(!side || !name) return;
     const idx = sideToIndex(side);
     const isYellow = cardType==="yellow";
@@ -762,6 +797,7 @@ async function startPanel(){
     // Load roster
     const rosterText = await fetchText("data/roster.json");
     roster = JSON.parse(rosterText);
+    mergeExtraPlayersIntoRoster();
 
     // Team pool init (for KO dropdowns)
     teamPool = loadTeamPool();
