@@ -53,80 +53,7 @@
     return Array.from(new Set(arr.map(x => String(x||"").trim()).filter(Boolean)));
   }
 
-  
-  // ====== Team Pool for KO dropdowns (QF/SF/TP/F) ======
-  const TEAM_POOL_KEY = "mbz_team_pool_v1";
-  let teamPool = [];
-
-  function rosterTeamNames(){
-    try { return Object.keys(roster||{}).filter(Boolean); } catch(e){ return []; }
-  }
-
-  function loadTeamPool(){
-    const base = rosterTeamNames();
-    if(!base.length) return [];
-    try{
-      const raw = localStorage.getItem(TEAM_POOL_KEY);
-      if(raw){
-        const arr = JSON.parse(raw);
-        if(Array.isArray(arr) && arr.length) return arr.filter(Boolean);
-      }
-    }catch(e){}
-    return base.slice();
-  }
-
-  function saveTeamPool(){
-    try{ localStorage.setItem(TEAM_POOL_KEY, JSON.stringify(teamPool)); }catch(e){}
-  }
-
-  function isKOMatch(m){
-    const code = String(m?.match_code||"").toUpperCase();
-    const g = String(m?.group||"").toUpperCase();
-    return (/^(QF|SF|TP|F)/.test(code)) || (["QF","SF","TP","F"].includes(g));
-  }
-
-  function fillSelectSimple(selId, arr, placeholder){
-    const sel = qs(selId);
-    if(!sel) return;
-    sel.innerHTML = "";
-    const p = document.createElement("option");
-    p.value = "";
-    p.textContent = placeholder || "اختر";
-    sel.appendChild(p);
-    arr.forEach(v=>{
-      const o = document.createElement("option");
-      o.value = v;
-      o.textContent = v;
-      sel.appendChild(o);
-    });
-  }
-
-  function renderTeamPoolUI(){
-    fillSelectSimple("#poolTeam", teamPool, "اختر فريقًا");
-    fillSelectSimple("#ko_team1", teamPool, "الفريق 1");
-    fillSelectSimple("#ko_team2", teamPool, "الفريق 2");
-  }
-
-  function applyKoSelectsFromCurrent(){
-    if(!current) return;
-    const s1 = qs("#ko_team1");
-    const s2 = qs("#ko_team2");
-    if(!s1 || !s2) return;
-    s1.value = optionExists(s1, current.team1) ? String(current.team1||"").trim() : "";
-    s2.value = optionExists(s2, current.team2) ? String(current.team2||"").trim() : "";
-  }
-
-  function showHideKoBox(){
-    const box = qs("#koBox");
-    if(!box) return;
-    if(current && isKOMatch(current)){
-      box.classList.remove("hidden");
-    }else{
-      box.classList.add("hidden");
-    }
-  }
-
-function optionExists(sel, value){
+  function optionExists(sel, value){
     if(!sel) return false;
     const v = String(value||"").trim();
     return Array.from(sel.options||[]).some(o => String(o.value||"").trim() === v);
@@ -153,29 +80,6 @@ function optionExists(sel, value){
     const mv = man ? man.value.trim() : "";
     if(mv) return mv;
     return sel ? sel.value.trim() : "";
-  }
-
-  // ✅ NEW: typed-player fallback for goals/cards when not in dropdown
-  function ensureOptionSelected(selectEl, name){
-    const v = String(name||"").trim();
-    if(!selectEl || !v) return "";
-    if(!optionExists(selectEl, v)){
-      const opt = document.createElement('option');
-      opt.value = v;
-      opt.textContent = v;
-      selectEl.appendChild(opt);
-    }
-    selectEl.value = v;
-    return v;
-  }
-
-  function getSelectOrTyped(selectSel, typedSel){
-    const sel = qs(selectSel);
-    const picked = sel ? sel.value.trim() : "";
-    if(picked) return picked;
-    const typed = qs(typedSel) ? qs(typedSel).value.trim() : "";
-    if(!typed) return "";
-    return ensureOptionSelected(sel, typed);
   }
 
   function formatListFromMap(map){
@@ -541,18 +445,6 @@ function setupPlayerDropdowns(){
     if(!current) return;
     current.score1 = qs("#score1").value.trim();
     current.score2 = qs("#score2").value.trim();
-
-    // KO: allow choosing teams for QF/SF/TP/F
-    if(isKOMatch(current)){
-      const t1 = (qs("#ko_team1")?.value || "").trim();
-      const t2 = (qs("#ko_team2")?.value || "").trim();
-      // keep empty allowed (you may fill later)
-      current.team1 = t1;
-      current.team2 = t2;
-      // refresh player dropdowns because teams changed
-      setupPlayerDropdowns();
-    }
-
     // VAR handled by applyVAREventsToMatch()
 
     // Backward-compatible counters used by UI badges (0/1)
@@ -565,7 +457,6 @@ function setupPlayerDropdowns(){
 
     applyMapsToCurrent();
     refreshCSVOut();
-    setupMatchDropdown();
     setMsg("#panelMsg", "تم حفظ التعديلات داخل اللوحة. الآن نزّل matches.csv وارفعه إلى GitHub.", false);
   }
 
@@ -586,15 +477,13 @@ function setupPlayerDropdowns(){
   function addGoal(){
     if(!current) return;
     const side = qs("#side").value;
-    const name = getSelectOrTyped("#player", "#playerSearch");
+    const name = qs("#player").value.trim();
     if(!side || !name) return;
     const idx = sideToIndex(side);
     const map = idx===1 ? goalsMap1 : goalsMap2;
     map[name] = (map[name]||0) + 1;
     history.push({type:"goal", idx, name});
     updatePreview();
-
-    if(qs('#playerSearch')) qs('#playerSearch').value = '';
   }
 
   function undoGoal(){
@@ -620,7 +509,7 @@ function setupPlayerDropdowns(){
   function addCard(cardType){
     if(!current) return;
     const side = qs("#cardSide").value;
-    const name = getSelectOrTyped("#cardPlayer", "#cardSearch");
+    const name = qs("#cardPlayer").value.trim();
     if(!side || !name) return;
     const idx = sideToIndex(side);
     const isYellow = cardType==="yellow";
@@ -628,8 +517,6 @@ function setupPlayerDropdowns(){
     map[name] = (map[name]||0) + 1;
     history.push({type:"card", idx, name, cardType});
     updatePreview();
-
-    if(qs('#cardSearch')) qs('#cardSearch').value = '';
   }
 
   function undoCard(){
@@ -789,39 +676,6 @@ async function startPanel(){
     // Load roster
     const rosterText = await fetchText("data/roster.json");
     roster = JSON.parse(rosterText);
-
-    // Team pool init (for KO dropdowns)
-    teamPool = loadTeamPool();
-    renderTeamPoolUI();
-
-    // Pool buttons
-    qs("#btnExcludeTeam")?.addEventListener("click", ()=>{
-      const sel = qs("#poolTeam");
-      const v = (sel?.value || "").trim();
-      if(!v) return;
-      teamPool = teamPool.filter(x => x !== v);
-      saveTeamPool();
-      renderTeamPoolUI();
-      applyKoSelectsFromCurrent();
-    });
-
-    qs("#btnResetPool")?.addEventListener("click", ()=>{
-      teamPool = rosterTeamNames();
-      saveTeamPool();
-      renderTeamPoolUI();
-      applyKoSelectsFromCurrent();
-    });
-
-    qs("#btnAddTeam")?.addEventListener("click", ()=>{
-      const inp = qs("#addTeamName");
-      const name = (inp?.value || "").trim();
-      if(!name) return;
-      if(!teamPool.includes(name)) teamPool.push(name);
-      if(inp) inp.value = "";
-      saveTeamPool();
-      renderTeamPoolUI();
-      applyKoSelectsFromCurrent();
-    });
 
     // Load matches
     const csvText = await fetchText("data/matches.csv");
