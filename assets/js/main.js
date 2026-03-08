@@ -109,7 +109,7 @@ const CupApp = (() => {
   function matchKey(m){
     const iso = parseArabicDateToISO(m.date);
     const time = String(m.time||"").trim();
-    const hhmm = time && /^\d{1,2}:\d{2}$/.test(time) ? time.replace(":","") : "0000";
+    const hhmm = time && /^\d{1,2}:\d{2}$/.test(time) ? time.split(':').map((x,i)=> i===0 ? x.padStart(2,'0') : x).join('') : '0000';
     return `${iso}T${hhmm}`;
   }
 

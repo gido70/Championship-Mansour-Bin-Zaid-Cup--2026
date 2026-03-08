@@ -29,6 +29,12 @@
 <style>
 select option{color:#000;background:#fff;}
 </style>
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0b1f3a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="كأس منصور">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
 </head>
 <body>
 <header class="topbar">
@@ -135,6 +141,7 @@ select option{color:#000;background:#fff;}
             <select id="commentator"></select>
             <input id="pomSearch" class="pill" placeholder="بحث لاعب (اكتب حرفين)" style="flex:1;min-width:140px" />
             <select id="pom"></select>
+            <input id="pom_manual" placeholder="أو اكتب اسم أفضل لاعب يدوياً" />
           </div>
 
           <div class="row">
@@ -253,7 +260,7 @@ select option{color:#000;background:#fff;}
             <select id="side"></select>
             <input id="playerSearch" class="pill" placeholder="بحث لاعب (اكتب حرفين)" style="flex:1;min-width:140px" />
             <select id="player"></select>
-        <input id="player_manual" class="input" placeholder="أو اكتب اسم اللاعب يدويًا" />
+            <input id="player_manual" placeholder="أو اكتب اسم اللاعب يدوياً" />
             <button class="btn btn-ga small" id="btnGoal">+ هدف</button>
           </div>
           <div class="row">
@@ -267,7 +274,7 @@ select option{color:#000;background:#fff;}
             <select id="cardSide"></select>
             <input id="cardSearch" class="pill" placeholder="بحث لاعب (اكتب حرفين)" style="flex:1;min-width:140px" />
             <select id="cardPlayer"></select>
-        <input id="cardPlayer_manual" class="input" placeholder="أو اكتب اسم اللاعب يدويًا" />
+            <input id="cardPlayer_manual" placeholder="أو اكتب اسم اللاعب يدوياً" />
             <button class="btn btn-gb small" id="btnYellow">🟨 أصفر</button>
             <button class="btn btn-gd small" id="btnRed">🟥 أحمر</button>
           </div>
@@ -348,6 +355,15 @@ select option{color:#000;background:#fff;}
 
 <script src="assets/js/admin.js"></script>
   <script src="assets/js/admin_awards.js"></script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("service-worker.js")
+        .then(function () { console.log("PWA ready"); })
+        .catch(function (err) { console.error("SW registration failed:", err); });
+    });
+  }
+</script>
 </body>
 </html>
 
