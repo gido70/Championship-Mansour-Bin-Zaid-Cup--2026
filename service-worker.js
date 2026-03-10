@@ -1,5 +1,5 @@
-const STATIC_CACHE = "mansour-static-v5";
-const DATA_CACHE = "mansour-data-v5";
+const STATIC_CACHE = "mansour-static-v7";
+const DATA_CACHE = "mansour-data-v7";
 
 const STATIC_ASSETS = [
   "./",
@@ -29,6 +29,7 @@ const STATIC_ASSETS = [
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png",
   "./assets/icons/apple-touch-icon.png",
+  "./assets/videos/f32-promo.mp4",
   "./manifest.webmanifest"
 ];
 
@@ -37,7 +38,8 @@ const DATA_PATTERNS = [
   "/data/roster.json",
   "/data/staff.json",
   "/data/standings.json",
-  "/data/awards.json"
+  "/data/awards.json",
+  "/data/videos.json"
 ];
 
 self.addEventListener("install", (event) => {
