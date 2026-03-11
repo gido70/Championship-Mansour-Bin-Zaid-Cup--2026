@@ -1,4 +1,4 @@
-const CACHE_NAME = "mansour-v2";
+const STATIC_CACHE = "mansour-cup-v2026";
 const DATA_CACHE = "mansour-data-v9";
 
 const STATIC_ASSETS = [
@@ -17,8 +17,6 @@ const STATIC_ASSETS = [
   "./tp.html",
   "./assets/css/style.css",
   "./assets/js/main.js",
-  "./assets/js/admin.js",
-  "./assets/js/admin_awards.js",
   "./assets/js/awards.js",
   "./assets/js/groups_all.js",
   "./assets/js/stats.js",
@@ -43,7 +41,7 @@ const DATA_PATTERNS = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => cache.addAll(STATIC_ASSETS))
+    caches.open(STATIC_CACHE).then((cache) => cache.addAll(STATIC_ASSETS).catch(()=>{}))
   );
   self.skipWaiting();
 });
@@ -66,36 +64,38 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
 
-  // ملفات البيانات: من الشبكة أولاً، ثم الكاش عند الطوارئ
   if (DATA_PATTERNS.some((p) => url.pathname.endsWith(p))) {
     event.respondWith(
       fetch(req, { cache: "no-store" })
         .then((res) => {
-          const copy = res.clone();
-          caches.open(DATA_CACHE).then((cache) => cache.put(req, copy));
+          if(res && res.ok){
+            const copy = res.clone();
+            caches.open(DATA_CACHE).then((cache) => cache.put(req, copy)).catch(()=>{});
+          }
           return res;
         })
         .catch(async () => {
           const cached = await caches.match(req);
           if (cached) return cached;
-          throw new Error("Network error and no cached data available.");
+          return new Response("", { status: 504, statusText: "Offline" });
         })
     );
     return;
   }
 
-  // بقية الملفات: من الشبكة أولاً ثم الكاش
   event.respondWith(
     fetch(req)
       .then((res) => {
-        const copy = res.clone();
-        caches.open(STATIC_CACHE).then((cache) => cache.put(req, copy));
+        if(res && res.ok){
+          const copy = res.clone();
+          caches.open(STATIC_CACHE).then((cache) => cache.put(req, copy)).catch(()=>{});
+        }
         return res;
       })
       .catch(async () => {
         const cached = await caches.match(req);
         if (cached) return cached;
-        throw new Error("Network error and no cached file available.");
+        return new Response("", { status: 504, statusText: "Offline" });
       })
   );
 });

@@ -9,7 +9,7 @@
   CupApp.initAwards = async function(){
     const errEl = document.getElementById("loadError");
     try{
-      const res = await fetch("data/awards.json", {cache:"no-store"});
+      const res = await fetch("data/awards.json?v=2026r1", {cache:"no-store"});
       if(!res.ok) throw new Error("تعذر تحميل data/awards.json");
       const a = await res.json();
       setText("bestTeam", a.bestTeam);
