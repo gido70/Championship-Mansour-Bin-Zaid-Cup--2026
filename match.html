@@ -120,9 +120,7 @@
       </div>
 
       <div id="loadError" class="note hidden"></div>
-      <div class="btn-row" style="margin-top:16px">
-        <a class="btn" id="backToGroup" href="knockout.html">العودة</a>
-      </div>
+      <div class="btn-row" style="margin-top:16px"><a class="btn" id="backToGroup" href="knockout.html">العودة</a></div>
     </div>
   </section>
 </main>
@@ -131,14 +129,14 @@
   © بطولة كأس منصور بن زايد 2026
 </footer>
 
-<script src="assets/js/main.js?v=20260311"></script>
+<script src="assets/js/main.js"></script>
 <script>
   CupApp.initMatch();
 </script>
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("service-worker.js?v=20260311")
+      navigator.serviceWorker.register("service-worker.js")
         .then(function () { console.log("PWA ready"); })
         .catch(function (err) { console.error("SW registration failed:", err); });
     });
