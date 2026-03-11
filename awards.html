@@ -1,103 +1,118 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>بطولة كأس منصور بن زايد 2026</title>
-  <link rel="stylesheet" href="assets/css/style.css" />
-  <link rel="manifest" href="manifest.webmanifest">
-  <meta name="theme-color" content="#0b1f3a">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="كأس منصور">
-  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>الجوائز الفردية - بطولة كأس منصور بن زايد 2026</title>
+
+<link rel="stylesheet" href="assets/css/style.css">
+
+<style>
+
+.awards-container{
+max-width:1100px;
+margin:auto;
+padding:40px 20px;
+text-align:center;
+}
+
+.awards-title{
+font-size:28px;
+margin-bottom:30px;
+color:white;
+}
+
+.awards-image{
+max-width:100%;
+border-radius:10px;
+cursor:pointer;
+transition:transform .25s;
+box-shadow:0 10px 40px rgba(0,0,0,.4);
+}
+
+.awards-image:hover{
+transform:scale(1.02);
+}
+
+.popup{
+display:none;
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,.85);
+align-items:center;
+justify-content:center;
+z-index:9999;
+}
+
+.popup img{
+max-width:90%;
+max-height:90%;
+border-radius:10px;
+}
+
+</style>
 </head>
 
 <body>
-  <header class="site-header">
-    <div class="header-inner">
-      <h1 class="site-title">بطولة كأس منصور بن زايد 2026</h1>
-    </div>
-    <nav class="nav">
-    <a class="nav-link" href="index.html">الرئيسية</a>
-    <a class="nav-link" href="group.html?g=A">المجموعة A</a>
-    <a class="nav-link" href="group.html?g=B">المجموعة B</a>
-    <a class="nav-link" href="group.html?g=C">المجموعة C</a>
-    <a class="nav-link" href="group.html?g=D">المجموعة D</a>
-    <a class="nav-link" href="groups_all.html">ترتيب جميع المجموعات</a>
-    <a class="nav-link" href="awards.html">الجوائز الفردية</a>
-    <a class="nav-link" href="stats.html">الإحصائيات</a>
-    <a class="nav-link" href="knockout.html">الأدوار النهائية</a>
-  </nav>
-  </header>
 
-  <main class="container">
-    <div class="page-head">
-      <h2 class="page-title">الجوائز الفردية</h2>
-      <div id="loadError" class="alert hidden"></div>
-    </div>
+<header class="site-header">
+<div class="header-inner">
+<h1 class="site-title">بطولة كأس منصور بن زايد 2026</h1>
+</div>
 
-    <section class="card award-card">
-      <div class="award-head">الفائز بالبطولة</div>
-      <div class="award-body">
-        <div class="award-name" id="bestTeam">—</div>
-      </div>
-    </section>
+<nav class="nav">
+<a class="nav-link" href="index.html">الرئيسية</a>
+<a class="nav-link" href="group.html?g=A">المجموعة A</a>
+<a class="nav-link" href="group.html?g=B">المجموعة B</a>
+<a class="nav-link" href="group.html?g=C">المجموعة C</a>
+<a class="nav-link" href="group.html?g=D">المجموعة D</a>
+<a class="nav-link" href="groups_all.html">ترتيب جميع المجموعات</a>
+<a class="nav-link" href="awards.html">الجوائز الفردية</a>
+<a class="nav-link" href="stats.html">الإحصائيات</a>
+<a class="nav-link" href="knockout.html">الأدوار النهائية</a>
+</nav>
+</header>
 
-    <div class="grid-2">
-      <section class="card award-card">
-        <div class="award-head">هداف البطولة</div>
-        <div class="award-body">
-          <div class="award-name" id="topScorer">—</div>
-          <div class="award-sub">الفريق: <span id="topScorerTeam">—</span></div>
-        </div>
-      </section>
 
-      <section class="card award-card">
-        <div class="award-head">أفضل لاعب</div>
-        <div class="award-body">
-          <div class="award-name" id="bestPlayer">—</div>
-          <div class="award-sub">الفريق: <span id="bestPlayerTeam">—</span></div>
-        </div>
-      </section>
+<div class="awards-container">
 
-      <section class="card award-card">
-        <div class="award-head">أفضل حارس</div>
-        <div class="award-body">
-          <div class="award-name" id="bestGK">—</div>
-          <div class="award-sub">الفريق: <span id="bestGKTeam">—</span></div>
-        </div>
-      </section>
+<div class="awards-title">
+الجوائز الفردية – بطولة كأس منصور بن زايد 2026
+</div>
 
-      <section class="card award-card">
-        <div class="award-head">إداري الفريق</div>
-        <div class="award-body">
-          <div class="award-name" id="bestAdmin">—</div>
-          <div class="award-sub">الفريق: <span id="bestAdminTeam">—</span></div>
-        </div>
-      </section>
-    </div>
+<img src="assets/img/awards2026.jpg"
+class="awards-image"
+onclick="openPopup()">
 
-    <div class="hint">
-      ملاحظة: يتم تعبئة هذه الصفحة من الملف <code>data/awards.json</code>.
-    </div>
-  </main>
+</div>
 
-  <script src="assets/js/awards.js"></script>
-  <script>document.addEventListener('DOMContentLoaded', ()=>CupApp.initAwards && CupApp.initAwards());</script>
 
-  <footer class="site-footer">
-    <div class="footer-inner">© بطولة كأس منصور بن زايد 2026</div>
-  </footer>
-  <script src="assets/js/main.js"></script>
+<div class="popup" id="popup" onclick="closePopup()">
+<img src="assets/img/awards2026.jpg">
+</div>
+
+
 <script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", function () {
-      navigator.serviceWorker.register("service-worker.js")
-        .then(function () { console.log("PWA ready"); })
-        .catch(function (err) { console.error("SW registration failed:", err); });
-    });
-  }
+
+function openPopup(){
+document.getElementById("popup").style.display="flex";
+}
+
+function closePopup(){
+document.getElementById("popup").style.display="none";
+}
+
 </script>
+
+
+<footer class="site-footer">
+<div class="footer-inner">
+© بطولة كأس منصور بن زايد 2026
+</div>
+</footer>
+
 </body>
 </html>
