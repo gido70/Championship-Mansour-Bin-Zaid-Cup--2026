@@ -51,10 +51,17 @@ const CupApp = (() => {
     });
   }
 
-
   async function loadVideos(){
     try{
-      const res = await fetch('data/videos.json?v=' + Date.now(), { cache: 'no-store' });
+      const url = 'data/videos.json?nocache=' + Date.now();
+      const res = await fetch(url,{
+        method:'GET',
+        headers:{
+          'Cache-Control':'no-cache, no-store, must-revalidate',
+          'Pragma':'no-cache',
+          'Expires':'0'
+        }
+      });
       if(!res.ok) throw new Error('videos not found');
       return await res.json();
     }catch(e){
@@ -76,7 +83,6 @@ const CupApp = (() => {
     const cls = compact ? '' : ' class="btn" target="_blank" rel="noopener"';
     return `<a${cls} href="${escapeHTML(url)}" target="_blank" rel="noopener">${label}</a>`;
   }
-
 
   async function loadMatches(){
     try{
@@ -123,7 +129,6 @@ const CupApp = (() => {
   }
 
   function parseArabicDateToISO(dateStr){
-    // expects: "الخميس, فبراير 19, 2026" (weekday optional)
     const s = String(dateStr||"").trim();
     const m = s.match(/(يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر)\s+(\d{1,2}),\s*(\d{4})/);
     if(!m) return "";
@@ -156,10 +161,9 @@ const CupApp = (() => {
   function isUpcoming(m){
     if(isPlayed(m)) return false;
     const iso = parseArabicDateToISO(m.date);
-    if(!iso) return true; // keep if date missing
+    if(!iso) return true;
     const now = new Date();
     const todayIso = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
-    // include today and after
     return iso >= todayIso;
   }
 
@@ -255,7 +259,6 @@ const CupApp = (() => {
       if(!map.has(r)) map.set(r, []);
       map.get(r).push(m);
     }
-    // sort rounds by common order (الأولى/الثانية/الثالثة) else keep
     const order = ['الجولة الأولى','الجولة الثانية','الجولة الثالثة','الجولة الرابعة'];
     const rounds = Array.from(map.keys()).sort((a,b) => {
       const ia = order.indexOf(a);
@@ -322,8 +325,7 @@ const CupApp = (() => {
     set('matchRef', ref);
     set('matchComm', m.commentator || '—');
     set('matchPOM', m.player_of_match || '—');
-    // VAR
-    // Multi events support (var1..var4). If present, show summary and counts.
+
     const varEvents = [];
     for(let i=1;i<=4;i++){
       const team = (m[`var${i}_team`] ?? "").trim();
@@ -349,12 +351,10 @@ const CupApp = (() => {
       const r = resMap[m.var_result] || "—";
       set('matchVAR', `تم استخدام VAR — لصالح: ${forTeam} — النوع: ${t} — القرار: ${r}`);
     }else{
-      // fallback counters (0-2 per team)
       const v1 = (m.var_team1===undefined || m.var_team1===null || m.var_team1==='') ? 0 : Number(m.var_team1);
       const v2 = (m.var_team2===undefined || m.var_team2===null || m.var_team2==='') ? 0 : Number(m.var_team2);
       set('matchVAR', `الفريق 1: ${isNaN(v1)?0:v1}/2 — الفريق 2: ${isNaN(v2)?0:v2}/2`);
     }
-
 
     const score = isPlayed(m) ? `${m.score1} - ${m.score2}` : 'لم تُلعب بعد';
     const scoreLine = qs('#scoreLine');
@@ -389,16 +389,13 @@ const CupApp = (() => {
   function renderGoalsList(text){
     const s = (text || '').trim();
     if(!s) return '<li class="muted">—</li>';
-    // split by ; or newline
     const parts = s.split(/;|\n|,|،|\||\/+/).map(x => x.trim()).filter(Boolean);
     return parts.map(p => `<li>${escapeHTML(formatGoalItem(p))}</li>`).join('');
   }
 
-
   function formatGoalItem(p){
     const t = String(p||'').trim();
     if(!t) return '';
-    // normalize common minute notations: "Name 12" -> "Name (12')"
     const m = t.match(/^(.*?)(?:\s*[\-:()]*\s*)(\d{1,3})(?:\s*['’]|\s*د|\s*min)?\s*$/);
     if(m && m[1] && m[2]){
       const name = m[1].trim().replace(/[\-:()]+$/,'').trim();
@@ -432,20 +429,17 @@ const CupApp = (() => {
     renderGroupMatches(matches, g, videos);
   }
 
-  
   async function initStage(stageCode, titleText){
     const code = String(stageCode || "").toUpperCase();
     const sub = qs('#pageSub'); if(sub) sub.textContent = titleText || code;
     const title = qs('#stageTitle'); if(title) title.textContent = titleText || code;
     const [matches, videos] = await Promise.all([loadMatches(), loadVideos()]);
-    // stage matches are those whose group equals stageCode (e.g., QF/SF/TP/F)
     const stageMatches = matches.filter(m => (m.group||"").toUpperCase() === code);
     const cnt = qs('#matchesCount'); if(cnt) cnt.textContent = String(stageMatches.length);
-    renderGroupMatches(stageMatches, code, videos); // renders into #matchesByRound
+    renderGroupMatches(stageMatches, code, videos);
   }
 
   async function initKnockout(){
-    // Nothing dynamic; page is static links
     return;
   }
 
