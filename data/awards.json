@@ -1,27 +1,11 @@
 {
-  "updated_at": "",
-  "teams": {
-    "champion": "",
-    "runnerup": "",
-    "third": "",
-    "fourth": ""
-  },
-  "individual": {
-    "top_scorer": {
-      "name": "",
-      "team": ""
-    },
-    "best_player": {
-      "name": "",
-      "team": ""
-    },
-    "best_keeper": {
-      "name": "",
-      "team": ""
-    },
-    "best_admin": {
-      "name": "",
-      "team": ""
-    }
-  }
+  "bestTeam": "مكتب الشؤون التنموية واسر الشهداء",
+  "topScorer": "جوناثان كودجيا كودجيا",
+  "topScorerTeam": "الارشيف والمكتبة الوطنية",
+  "bestPlayer": "جيانيلي امبولا وانق",
+  "bestPlayerTeam": "الارشيف والمكتبة الوطنية",
+  "bestGK": "قويليرمي روتشا بيرالدو",
+  "bestGKTeam": "مكتب الشؤون التنموية واسر الشهداء",
+  "bestAdmin": "عبدالله عايض الهاجري",
+  "bestAdminTeam": "مكتب الشؤون التنموية واسر الشهداء"
 }
