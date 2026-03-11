@@ -1,4 +1,4 @@
-const STATIC_CACHE = "mansour-static-v9";
+const CACHE_NAME = "mansour-cup-v2026";
 const DATA_CACHE = "mansour-data-v9";
 
 const STATIC_ASSETS = [
