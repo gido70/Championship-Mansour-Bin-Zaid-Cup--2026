@@ -1,5 +1,5 @@
-const STATIC_CACHE = "mansour-static-v5";
-const DATA_CACHE = "mansour-data-v5";
+const STATIC_CACHE = "mansour-static-v9";
+const DATA_CACHE = "mansour-data-v9";
 
 const STATIC_ASSETS = [
   "./",
@@ -37,7 +37,8 @@ const DATA_PATTERNS = [
   "/data/roster.json",
   "/data/staff.json",
   "/data/standings.json",
-  "/data/awards.json"
+  "/data/awards.json",
+  "/data/videos.json"
 ];
 
 self.addEventListener("install", (event) => {
@@ -65,6 +66,7 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
 
+  // ملفات البيانات: من الشبكة أولاً، ثم الكاش عند الطوارئ
   if (DATA_PATTERNS.some((p) => url.pathname.endsWith(p))) {
     event.respondWith(
       fetch(req, { cache: "no-store" })
@@ -82,14 +84,18 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // بقية الملفات: من الشبكة أولاً ثم الكاش
   event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req).then((res) => {
+    fetch(req)
+      .then((res) => {
         const copy = res.clone();
         caches.open(STATIC_CACHE).then((cache) => cache.put(req, copy));
         return res;
-      });
-    })
+      })
+      .catch(async () => {
+        const cached = await caches.match(req);
+        if (cached) return cached;
+        throw new Error("Network error and no cached file available.");
+      })
   );
 });
